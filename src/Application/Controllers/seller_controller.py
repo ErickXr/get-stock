@@ -1,6 +1,7 @@
 from flask import request, jsonify, make_response
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from src.Application.Service.seller_service import SellerService
+from src.Application.Service.auth_guard import get_current_user
 from src.Infrastructure.Model.seller_model import SellerModel
 from src.Infrastructure.http.whats_app import enviar_codigo_whatsapp
 from src.config.data_base import db
@@ -124,7 +125,7 @@ class SellerController:
         if seller.status != "ativo":
             return make_response(jsonify({"erro": "Seller ainda não ativado"}), 403)
 
-        token = create_access_token(identity=str(seller.id))
+        token = create_access_token(identity=f"seller:{seller.id}")
 
         return make_response(jsonify({
             "mensagem": "Login realizado com sucesso",
@@ -136,19 +137,18 @@ class SellerController:
     @jwt_required()
     def update_seller():
         try:
-            current_id = get_jwt_identity()
+            entity, _, _ = get_current_user()
             data = request.get_json()
 
             if not data:
                 return make_response(jsonify({"erro": "Corpo da requisição não pode ser vazio"}), 400)
 
-            # Validar campos permitidos
             campos_permitidos = ['nome', 'email', 'celular', 'cnpj', 'senha']
             for campo in data.keys():
                 if campo not in campos_permitidos:
                     return make_response(jsonify({"erro": f"Campo '{campo}' não é permitido"}), 400)
 
-            update_seller = SellerService.update_seller(current_id, data)
+            update_seller = SellerService.update_seller(entity.id, data)
             if not update_seller:
                 return make_response(jsonify({"erro": "Seller não encontrado"}), 404)
 
@@ -167,10 +167,9 @@ class SellerController:
     @jwt_required()
     def get_me():
         try:
-            current_id = get_jwt_identity()
-            seller = SellerService.get_by_id(current_id)
-            if not seller:
+            entity, _, _ = get_current_user()
+            if not entity:
                 return make_response(jsonify({"erro": "Seller não encontrado"}), 404)
-            return make_response(jsonify(seller.to_dict()), 200)
+            return make_response(jsonify(entity.to_dict()), 200)
         except Exception as e:
-            return make_response(jsonify({"erro": "Erro interno", "detalhes": str(e)}), 500)
+            return make_response(jsonify({"erro": "Erro interno", "detalhes": str(e)}), 500)

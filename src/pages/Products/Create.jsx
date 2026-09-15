@@ -1,17 +1,21 @@
-import React from "react";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { api } from "../../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+
+const CATEGORIAS = ["Bebidas","Laticinios","Padaria","Carnes","Limpeza","Higiene","Cereais","Frios","Congelados","Outros"];
 
 export default function CreateProduct() {
   const [formData, setFormData] = useState({
     nome: "",
     preco: "",
     quantidade: "",
-    imagem: ""
+    estoque_minimo: "5",
+    categoria: "",
+    imagem: "",
   });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -20,6 +24,7 @@ export default function CreateProduct() {
     if (!file) return;
 
     setUploading(true);
+    setError("");
     const data = new FormData();
     data.append("image", file);
 
@@ -28,8 +33,7 @@ export default function CreateProduct() {
       setFormData({ ...formData, imagem: response.data.url });
     } catch (err) {
       const errorMsg = err.response?.data?.erro || err.response?.data?.mensagem || "Erro ao fazer upload da imagem.";
-      alert("Erro: " + errorMsg);
-      console.error(err);
+      setError(errorMsg);
     } finally {
       setUploading(false);
     }
@@ -38,95 +42,145 @@ export default function CreateProduct() {
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
+    setError("");
+
     try {
       await api.post("/api/products", {
         ...formData,
         preco: parseFloat(formData.preco),
-        quantidade: parseInt(formData.quantidade)
+        quantidade: parseInt(formData.quantidade),
+        estoque_minimo: parseInt(formData.estoque_minimo || "5"),
       });
       navigate("/produtos");
     } catch (err) {
       const errorMsg = err.response?.data?.detalhes || err.response?.data?.erro || "Erro ao cadastrar produto.";
-      alert("Erro: " + errorMsg);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="container">
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <h1>Novo Produto</h1>
-        <div className="glass-card">
-          <form onSubmit={handleSubmit}>
+    <div className="page-content" style={{ maxWidth: "680px" }}>
+      <div style={{ marginBottom: "2rem" }}>
+        <h1>Cadastrar Novo Produto</h1>
+        <p className="subtitle">Preencha os dados da mercadoria para inseri-la no catálogo</p>
+      </div>
+
+      {error && (
+        <div className="error-box" style={{ marginBottom: "1.5rem" }}>
+          {error}
+        </div>
+      )}
+
+      <div className="card">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Nome da Mercadoria</label>
+            <input
+              type="text"
+              required
+              placeholder="Ex: Arroz Tipo 1 5kg"
+              value={formData.nome}
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div className="form-group">
-              <label>Nome do Produto</label>
-              <input 
-                type="text" 
-                required 
-                onChange={(e) => setFormData({...formData, nome: e.target.value})}
+              <label>Preco Unitario de Venda (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                placeholder="0,00"
+                value={formData.preco}
+                onChange={(e) => setFormData({ ...formData, preco: e.target.value })}
               />
             </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label>Preço (R$)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  required 
-                  onChange={(e) => setFormData({...formData, preco: e.target.value})}
-                />
-              </div>
-              <div className="form-group">
-                <label>Quantidade em Estoque</label>
-                <input 
-                  type="number" 
-                  required 
-                  onChange={(e) => setFormData({...formData, quantidade: e.target.value})}
-                />
-              </div>
-            </div>
 
             <div className="form-group">
-              <label>Imagem do Produto (Opcional)</label>
-              <div>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? "Enviando..." : "Escolher arquivo"}
-                </button>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  disabled={uploading}
-                  style={{ display: 'none' }}
-                />
-              </div>
-              {/* {uploading && <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '5px' }}>Fazendo upload...</p>} removido pois o botão já diz 'Enviando...' */}
-              {formData.imagem && (
-                <div style={{ marginTop: '10px' }}>
-                  <p style={{ fontSize: '0.9rem', marginBottom: '5px', color: '#888' }}>Pré-visualização:</p>
-                  <img src={formData.imagem} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover' }} />
-                </div>
-              )}
+              <label>Quantidade em Estoque</label>
+              <input
+                type="number"
+                min="0"
+                required
+                placeholder="0"
+                value={formData.quantidade}
+                onChange={(e) => setFormData({ ...formData, quantidade: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <div className="form-group">
+              <label>Categoria</label>
+              <select
+                value={formData.categoria}
+                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                style={{ width:"100%", padding:"0.5rem 0.75rem", border:"1px solid var(--border-subtle)", borderRadius:"var(--radius-sm)", background:"var(--bg-surface)", color:"var(--text-main)", fontFamily:"inherit", fontSize:"0.875rem" }}
+              >
+                <option value="">Sem categoria</option>
+                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Estoque Minimo para Alerta</label>
+              <input
+                type="number"
+                min="0"
+                placeholder="5"
+                value={formData.estoque_minimo}
+                onChange={(e) => setFormData({ ...formData, estoque_minimo: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Foto do Produto (Opcional)</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "0.25rem" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? "Enviando imagem..." : "Selecionar Imagem"}
+              </button>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                disabled={uploading}
+                style={{ display: "none" }}
+              />
+              <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>
+                {formData.imagem ? "Imagem selecionada" : "Formatos JPG, PNG ou WebP"}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? "Salvando..." : "Cadastrar Produto"}
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => navigate("/produtos")}>
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
+            {formData.imagem && (
+              <div style={{ marginTop: "1rem" }}>
+                <img
+                  src={formData.imagem}
+                  alt="Pré-visualização"
+                  style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "2rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border-subtle)" }}>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? "Salvando..." : "Salvar Produto"}
+            </button>
+            <Link to="/produtos" className="btn btn-secondary">
+              Cancelar
+            </Link>
+          </div>
+        </form>
       </div>
     </div>
   );

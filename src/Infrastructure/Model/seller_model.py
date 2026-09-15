@@ -12,9 +12,10 @@ class SellerModel(db.Model):
     status = db.Column(db.String(20), default="pendente")
     codigo_ativacao = db.Column(db.String(10), nullable=True)
 
-    # Relações que permitem acessar os produtos e vendas de um vendedor.
+    # Relações que permitem acessar os produtos, vendas e funcionários de um vendedor.
     products = db.relationship("ProductModel", backref="seller", lazy=True)
     sales = db.relationship("SaleModel", backref="seller_owner", lazy=True)
+    users = db.relationship("UserModel", backref="seller", lazy=True)
 
     def to_dict(self):
         return {

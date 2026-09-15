@@ -14,21 +14,21 @@ import EditProduct from "./pages/Products/Edit.jsx";
 import SalesList from "./pages/Sales/List.jsx";
 import CreateSale from "./pages/Sales/Create.jsx";
 
+import UsersList from "./pages/Users/List.jsx";
+import CreateUser from "./pages/Users/Create.jsx";
+
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import Navbar from "./components/Navbar.jsx";
 
 function App() {
   return (
     <BrowserRouter>
-      <Navbar />
-
       <Routes>
         {/* Públicas */}
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<RegisterSeller />} />
         <Route path="/activate" element={<ActivateSeller />} />
 
-        {/* Privadas */}
+        {/* Privadas (renderizadas com Sidebar e layout integrado) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/perfil" element={<Profile />} />
@@ -39,6 +39,10 @@ function App() {
 
           <Route path="/vendas" element={<SalesList />} />
           <Route path="/vendas/nova" element={<CreateSale />} />
+
+          {/* Funcionários */}
+          <Route path="/funcionarios" element={<UsersList />} />
+          <Route path="/funcionarios/novo" element={<CreateUser />} />
         </Route>
       </Routes>
     </BrowserRouter>
