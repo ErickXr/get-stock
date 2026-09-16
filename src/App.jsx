@@ -1,5 +1,5 @@
-import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+﻿import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login.jsx";
 import RegisterSeller from "./pages/RegisterSeller.jsx";
@@ -25,6 +25,7 @@ function App() {
       <Routes>
         {/* Públicas */}
         <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<RegisterSeller />} />
         <Route path="/activate" element={<ActivateSeller />} />
 
@@ -33,17 +34,35 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/perfil" element={<Profile />} />
 
+          {/* Produtos (rotas principais e aliases) */}
           <Route path="/produtos" element={<ProductList />} />
           <Route path="/produtos/novo" element={<CreateProduct />} />
           <Route path="/produtos/:id" element={<EditProduct />} />
+          <Route path="/produtos/:id/edit" element={<EditProduct />} />
+          <Route path="/produtos/:id/editar" element={<EditProduct />} />
 
+          <Route path="/products" element={<ProductList />} />
+          <Route path="/products/create" element={<CreateProduct />} />
+          <Route path="/products/new" element={<CreateProduct />} />
+          <Route path="/products/:id/edit" element={<EditProduct />} />
+
+          {/* Vendas (rotas principais e aliases) */}
           <Route path="/vendas" element={<SalesList />} />
           <Route path="/vendas/nova" element={<CreateSale />} />
+          <Route path="/vendas/novo" element={<CreateSale />} />
+          <Route path="/sales" element={<SalesList />} />
+          <Route path="/sales/create" element={<CreateSale />} />
+          <Route path="/sales/new" element={<CreateSale />} />
 
           {/* Funcionários */}
           <Route path="/funcionarios" element={<UsersList />} />
           <Route path="/funcionarios/novo" element={<CreateUser />} />
+          <Route path="/users" element={<UsersList />} />
+          <Route path="/users/create" element={<CreateUser />} />
         </Route>
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );
