@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import request, jsonify, make_response, Response
 from src.Application.Service.sale_service import SaleService
 from src.Application.Service.auth_guard import get_current_user, require_nivel
+from src.Infrastructure.Model.user_model import UserModel
 
 class SaleController:
 
@@ -10,22 +11,49 @@ class SaleController:
     @require_nivel("admin", "gerente", "operador")
     def create():
         try:
-            _, _, seller_id = get_current_user()
-            data = request.get_json()
-            product_id      = data.get("produtoId")
-            quantity        = data.get("quantidade")
-            forma_pagamento = data.get("forma_pagamento", "dinheiro")
-            desconto        = float(data.get("desconto", 0.0))
+            entidade, nivel, seller_id = get_current_user()
+            data = request.get_json(force=True)
 
-            if not product_id or not quantity:
-                return make_response(jsonify({"erro": "Campos 'produtoId' e 'quantidade' são obrigatórios"}), 400)
-            if not isinstance(quantity, int) or quantity <= 0:
-                return make_response(jsonify({"erro": "'quantidade' deve ser um número inteiro positivo"}), 400)
+            # Extração de itens (suporta novo formato com carrinho e formato legado)
+            items = data.get("items")
+            if not items:
+                prod_id = data.get("produtoId") or data.get("product_id")
+                qty = data.get("quantidade") or data.get("quantity")
+                if prod_id and qty:
+                    items = [{"product_id": int(prod_id), "quantity": int(qty)}]
+                else:
+                    return make_response(jsonify({"erro": "Informe ao menos um produto no carrinho."}), 400)
 
-            sale = SaleService.create(product_id, quantity, seller_id, forma_pagamento, desconto)
-            return make_response(jsonify({"mensagem": "Venda realizada com sucesso!", "venda": sale.to_dict()}), 201)
+            forma_pagamento = data.get("payment_method") or data.get("forma_pagamento") or "dinheiro"
+            desconto = float(data.get("discount") or data.get("desconto") or 0.0)
+            customer_id = data.get("customer_id") or data.get("cliente_id")
+
+            # Identificação do operador
+            user_id = None
+            usuario_nome = "Dono (Admin)"
+            if isinstance(entidade, UserModel):
+                user_id = entidade.id
+                usuario_nome = f"{entidade.nome} ({nivel.capitalize()})"
+            elif hasattr(entidade, "nome"):
+                usuario_nome = f"{entidade.nome} (Admin)"
+
+            sale = SaleService.create_cart_sale(
+                items_data=items,
+                seller_id=seller_id,
+                forma_pagamento=forma_pagamento,
+                desconto=desconto,
+                user_id=user_id,
+                usuario_nome=usuario_nome,
+                customer_id=customer_id
+            )
+
+            return make_response(jsonify({
+                "mensagem": "Venda realizada com sucesso!",
+                "venda": sale.to_dict()
+            }), 201)
+
         except ValueError as e:
-            return make_response(jsonify({"erro": str(e)}), 409)
+            return make_response(jsonify({"erro": str(e)}), 400)
         except Exception as e:
             return make_response(jsonify({"erro": "Erro interno ao processar a venda", "detalhes": str(e)}), 500)
 
@@ -37,11 +65,12 @@ class SaleController:
             inicio_str = request.args.get("inicio")
             fim_str    = request.args.get("fim")
             forma      = request.args.get("forma")
+            customer_id = request.args.get("customer_id")
 
             inicio = datetime.fromisoformat(inicio_str) if inicio_str else None
             fim    = datetime.fromisoformat(fim_str + "T23:59:59") if fim_str else None
 
-            sales = SaleService.list_by_seller(seller_id, inicio=inicio, fim=fim, forma=forma)
+            sales = SaleService.list_by_seller(seller_id, inicio=inicio, fim=fim, forma=forma, customer_id=customer_id)
             return make_response(jsonify(sales), 200)
         except Exception as e:
             return make_response(jsonify({"erro": str(e)}), 500)
@@ -51,12 +80,18 @@ class SaleController:
     def cancel_sale(sale_id):
         try:
             _, _, seller_id = get_current_user()
-            data  = request.get_json() or {}
+            data = request.get_json() or {}
             motivo = data.get("motivo", "")
-            sale  = SaleService.cancel(sale_id, seller_id, motivo)
-            return make_response(jsonify({"mensagem": "Venda cancelada com sucesso", "venda": sale.to_dict()}), 200)
+            if not motivo or not str(motivo).strip():
+                return make_response(jsonify({"erro": "O motivo do cancelamento é obrigatório."}), 400)
+
+            sale = SaleService.cancel(sale_id, seller_id, motivo)
+            return make_response(jsonify({
+                "mensagem": "Venda cancelada com sucesso e estoque estornado!",
+                "venda": sale.to_dict()
+            }), 200)
         except ValueError as e:
-            return make_response(jsonify({"erro": str(e)}), 409)
+            return make_response(jsonify({"erro": str(e)}), 400)
         except Exception as e:
             return make_response(jsonify({"erro": str(e)}), 500)
 
@@ -68,42 +103,45 @@ class SaleController:
             inicio_str = request.args.get("inicio")
             fim_str    = request.args.get("fim")
             forma      = request.args.get("forma")
+            customer_id = request.args.get("customer_id")
 
             inicio = datetime.fromisoformat(inicio_str) if inicio_str else None
             fim    = datetime.fromisoformat(fim_str + "T23:59:59") if fim_str else None
 
-            sales = SaleService.list_by_seller(seller_id, inicio=inicio, fim=fim, forma=forma)
+            sales = SaleService.list_by_seller(seller_id, inicio=inicio, fim=fim, forma=forma, customer_id=customer_id)
 
             formas_map = {
                 "dinheiro": "Dinheiro",
                 "pix": "PIX",
                 "debito": "Cartão de Débito",
-                "credito": "Cartão de Crédito"
+                "credito": "Cartão de Crédito",
+                "fiado": "Fiado / Caderneta"
             }
 
             output = io.StringIO()
-            # Delimitador ponto e vírgula (;) para abrir perfeitamente colunado no Excel (padrão Brasil/Europa)
             writer = csv.writer(output, delimiter=';', quoting=csv.QUOTE_MINIMAL)
-            
-            # Cabeçalho formatado
+
             writer.writerow([
-                "Código",
+                "Cód. Venda",
                 "Data / Hora",
+                "Operador",
+                "Cliente (Fiado)",
                 "Produto",
-                "Qtd Vendida",
-                "Preço Unitário (R$)",
-                "Desconto (R$)",
-                "Valor Total (R$)",
+                "Qtd",
+                "Preço Unit. (R$)",
+                "Subtotal Item (R$)",
+                "Desconto Venda (R$)",
+                "Total Venda (R$)",
                 "Forma de Pagamento",
                 "Status da Venda",
                 "Motivo Cancelamento"
             ])
 
-            total_qtd = 0
-            total_faturamento = 0.0
+            total_itens_vendidos = 0
+            total_faturamento_liquido = 0.0
+            vendas_ativas_contabilizadas = set()
 
             for s in sales:
-                # Formatação de data
                 data_formatada = ""
                 if s.get("created_at"):
                     try:
@@ -114,45 +152,79 @@ class SaleController:
 
                 status_label = "Concluída" if s.get("status") == "ativa" else "Cancelada"
                 forma_label = formas_map.get(s.get("forma_pagamento", ""), s.get("forma_pagamento", "Outro"))
-                
-                preco_un = f"{s.get('preco_venda', 0):.2f}".replace('.', ',')
-                desconto_val = f"{s.get('desconto', 0):.2f}".replace('.', ',')
-                total_val = f"{s.get('total', 0):.2f}".replace('.', ',')
+                operador = s.get("usuario_nome") or "Dono (Admin)"
+                cliente = s.get("cliente_nome") or "Balcão"
+                desconto_venda = f"{s.get('desconto', 0):.2f}".replace('.', ',')
+                total_venda = f"{s.get('total', 0):.2f}".replace('.', ',')
 
-                if s.get("status") == "ativa":
-                    total_qtd += s.get("quantidade", 0)
-                    total_faturamento += float(s.get("total", 0))
+                is_ativa = s.get("status") == "ativa"
+                if is_ativa and s["id"] not in vendas_ativas_contabilizadas:
+                    total_faturamento_liquido += float(s.get("total", 0.0))
+                    vendas_ativas_contabilizadas.add(s["id"])
 
-                writer.writerow([
-                    s.get("id", ""),
-                    data_formatada,
-                    s.get("produto_nome", f"Produto #{s.get('product_id')}"),
-                    s.get("quantidade", 0),
-                    preco_un,
-                    desconto_val,
-                    total_val,
-                    forma_label,
-                    status_label,
-                    s.get("motivo_cancelamento") or ""
-                ])
+                items = s.get("items") or []
+                if items:
+                    for idx, item in enumerate(items):
+                        if is_ativa:
+                            total_itens_vendidos += int(item.get("quantity", 0))
 
-            # Linha em branco e Linha de Totais para análise no Excel
+                        desc_col = desconto_venda if idx == 0 else ""
+                        total_col = total_venda if idx == 0 else ""
+
+                        writer.writerow([
+                            s.get("id", ""),
+                            data_formatada,
+                            operador,
+                            cliente,
+                            item.get("product_name", ""),
+                            item.get("quantity", 0),
+                            f"{item.get('unit_price', 0):.2f}".replace('.', ','),
+                            f"{item.get('subtotal', 0):.2f}".replace('.', ','),
+                            desc_col,
+                            total_col,
+                            forma_label,
+                            status_label,
+                            s.get("motivo_cancelamento") or ""
+                        ])
+                else:
+                    if is_ativa:
+                        total_itens_vendidos += int(s.get("quantidade", 0))
+
+                    writer.writerow([
+                        s.get("id", ""),
+                        data_formatada,
+                        operador,
+                        cliente,
+                        s.get("produto_nome", f"Produto #{s.get('product_id')}"),
+                        s.get("quantidade", 0),
+                        f"{s.get('preco_venda', 0):.2f}".replace('.', ','),
+                        f"{s.get('total_bruto', s.get('total', 0)):.2f}".replace('.', ','),
+                        desconto_venda,
+                        total_venda,
+                        forma_label,
+                        status_label,
+                        s.get("motivo_cancelamento") or ""
+                    ])
+
+            # Linha de Totais sem duplicar descontos
             writer.writerow([])
             writer.writerow([
                 "TOTAIS (Vendas Ativas)",
                 "",
                 "",
-                total_qtd,
+                f"{len(vendas_ativas_contabilizadas)} vendas",
+                "",
+                total_itens_vendidos,
                 "",
                 "",
-                f"{total_faturamento:.2f}".replace('.', ','),
+                "",
+                f"{total_faturamento_liquido:.2f}".replace('.', ','),
                 "",
                 "",
                 ""
             ])
 
             output.seek(0)
-            # UTF-8 com BOM (\ufeff) para o Excel reconhecer acentos e caracteres especiais em português
             return Response(
                 "\ufeff" + output.getvalue(),
                 mimetype="text/csv; charset=utf-8-sig",

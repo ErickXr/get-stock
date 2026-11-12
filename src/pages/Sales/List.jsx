@@ -8,6 +8,7 @@ export default function SalesList() {
   const [filtroForma, setFiltroForma] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  const [expandedSaleIds, setExpandedSaleIds] = useState(new Set());
   
   // Modal de Cancelamento
   const [saleParaCancelar, setSaleParaCancelar] = useState(null);
@@ -36,6 +37,15 @@ export default function SalesList() {
     loadSales();
   }, [filtroForma, dataInicio, dataFim]);
 
+  function toggleExpand(saleId) {
+    setExpandedSaleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(saleId)) next.delete(saleId);
+      else next.add(saleId);
+      return next;
+    });
+  }
+
   async function handleExportCSV() {
     try {
       const params = new URLSearchParams();
@@ -63,6 +73,11 @@ export default function SalesList() {
   async function confirmarCancelamento(e) {
     e.preventDefault();
     if (!saleParaCancelar) return;
+    if (!motivoCancelamento.trim()) {
+      setCancelError("Por favor, informe o motivo do cancelamento.");
+      return;
+    }
+
     setCancelando(true);
     setCancelError("");
 
@@ -106,7 +121,7 @@ export default function SalesList() {
 
   return (
     <div className="page-content">
-      {/* Topo */}
+      {/* Topo / Título & Ações */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <h1>Histórico de Vendas</h1>
@@ -129,7 +144,7 @@ export default function SalesList() {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Nova Venda
+            Nova Venda (PDV)
           </Link>
         </div>
       </div>
@@ -165,6 +180,7 @@ export default function SalesList() {
             <option value="pix">PIX</option>
             <option value="debito">Cartão Débito</option>
             <option value="credito">Cartão Crédito</option>
+            <option value="fiado">Fiado / Caderneta</option>
           </select>
         </div>
 
@@ -184,11 +200,12 @@ export default function SalesList() {
         <table>
           <thead>
             <tr>
-              <th>Data & Horário</th>
-              <th>Produto</th>
-              <th style={{ textAlign: "center" }}>Qtd</th>
+              <th style={{ width: "32px" }}></th>
+              <th>Cód / Data</th>
+              <th>Operador</th>
+              <th>Produtos</th>
+              <th style={{ textAlign: "center" }}>Itens</th>
               <th>Pagamento</th>
-              <th style={{ textAlign: "right" }}>Preço Un.</th>
               <th style={{ textAlign: "right" }}>Desconto</th>
               <th style={{ textAlign: "right" }}>Total</th>
               <th style={{ textAlign: "center" }}>Status</th>
@@ -198,13 +215,13 @@ export default function SalesList() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--text-muted)" }}>
+                <td colSpan="10" style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--text-muted)" }}>
                   Carregando histórico de vendas...
                 </td>
               </tr>
             ) : sales.length === 0 ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: "center", padding: "3.5rem 1rem", color: "var(--text-secondary)" }}>
+                <td colSpan="10" style={{ textAlign: "center", padding: "3.5rem 1rem", color: "var(--text-secondary)" }}>
                   <p style={{ fontWeight: 500, marginBottom: "0.5rem" }}>Nenhuma venda encontrada para os filtros aplicados.</p>
                   <Link to="/vendas/nova" className="btn btn-secondary" style={{ marginTop: "0.5rem" }}>
                     Registrar Venda
@@ -214,6 +231,7 @@ export default function SalesList() {
             ) : (
               sales.map((sale) => {
                 const isCancelada = sale.status === "cancelada";
+                const isExpanded = expandedSaleIds.has(sale.id);
                 const dataFormatada = new Date(sale.created_at).toLocaleDateString("pt-BR", {
                   day: "2-digit",
                   month: "2-digit",
@@ -225,72 +243,176 @@ export default function SalesList() {
                 });
 
                 return (
-                  <tr key={sale.id} style={{ opacity: isCancelada ? 0.6 : 1, background: isCancelada ? "rgba(0,0,0,0.01)" : "transparent" }}>
-                    <td>
-                      <div style={{ fontWeight: 500, color: "var(--text-main)", textDecoration: isCancelada ? "line-through" : "none" }}>
-                        {dataFormatada}
-                      </div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>às {horaFormatada}</div>
-                    </td>
-
-                    <td>
-                      <span style={{ fontWeight: 600, color: "var(--text-main)", textDecoration: isCancelada ? "line-through" : "none" }}>
-                        {sale.produto_nome || `Produto #${sale.product_id}`}
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: "center", fontWeight: 500 }}>
-                      {sale.quantidade} un
-                    </td>
-
-                    <td>
-                      {badgeForma(sale.forma_pagamento)}
-                    </td>
-
-                    <td style={{ textAlign: "right", color: "var(--text-secondary)" }}>
-                      {fmtBRL(sale.preco_venda)}
-                    </td>
-
-                    <td style={{ textAlign: "right", color: sale.desconto > 0 ? "#b45309" : "var(--text-muted)", fontSize: "0.8125rem" }}>
-                      {sale.desconto > 0 ? `- ${fmtBRL(sale.desconto)}` : "—"}
-                    </td>
-
-                    <td style={{ textAlign: "right", fontWeight: 700, color: isCancelada ? "var(--text-muted)" : "var(--accent)" }}>
-                      {fmtBRL(sale.total ?? (sale.quantidade * sale.preco_venda - (sale.desconto || 0)))}
-                    </td>
-
-                    <td style={{ textAlign: "center" }}>
-                      <span style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        padding: "0.2rem 0.5rem",
-                        borderRadius: "999px",
-                        background: isCancelada ? "#fee2e2" : "var(--accent-subtle)",
-                        color: isCancelada ? "#991b1b" : "var(--accent-text)",
-                        border: `1px solid ${isCancelada ? "#fca5a5" : "var(--accent-border)"}`
-                      }}>
-                        {isCancelada ? "Cancelada" : "Ativa"}
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: "center" }}>
-                      {!isCancelada && (
+                  <React.Fragment key={sale.id}>
+                    <tr style={{ opacity: isCancelada ? 0.6 : 1, background: isExpanded ? "var(--bg-subtle)" : "transparent" }}>
+                      {/* Botão de Expandir/Recolher Accordion */}
+                      <td style={{ textAlign: "center", padding: "0.5rem" }}>
                         <button
-                          onClick={() => setSaleParaCancelar(sale)}
-                          className="btn btn-secondary"
-                          style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#dc2626" }}
-                          title="Cancelar venda e estornar estoque"
+                          type="button"
+                          onClick={() => toggleExpand(sale.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--accent)",
+                            fontSize: "0.8125rem",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                            transition: "transform 0.15s ease",
+                            padding: "0.2rem"
+                          }}
+                          title={isExpanded ? "Recolher itens" : "Ver itens da venda"}
                         >
-                          Cancelar
+                          ▶
                         </button>
-                      )}
-                      {isCancelada && sale.motivo_cancelamento && (
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic" }} title={sale.motivo_cancelamento}>
-                          Motivo reg.
+                      </td>
+
+                      {/* Código e Data */}
+                      <td>
+                        <div style={{ fontWeight: 600, color: "var(--text-main)" }}>#{sale.id}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{dataFormatada} às {horaFormatada}</div>
+                      </td>
+
+                      {/* Operador */}
+                      <td style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>
+                        {sale.usuario_nome || "Dono (Admin)"}
+                      </td>
+
+                      {/* Nome Resumido do Produto */}
+                      <td>
+                        <div 
+                          onClick={() => toggleExpand(sale.id)} 
+                          style={{ fontWeight: 600, color: "var(--text-main)", cursor: "pointer", textDecoration: isCancelada ? "line-through" : "none" }}
+                          title="Clique para expandir/ver itens"
+                        >
+                          {sale.produto_nome}
+                        </div>
+                        {sale.items && sale.items.length > 1 && (
+                          <div style={{ fontSize: "0.6875rem", color: "var(--accent)", fontWeight: 500 }}>
+                            {sale.items.length} itens inclusos
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Quantidade Total */}
+                      <td style={{ textAlign: "center", fontWeight: 500 }}>
+                        {sale.quantidade} un
+                      </td>
+
+                      {/* Pagamento */}
+                      <td>
+                        {badgeForma(sale.forma_pagamento)}
+                      </td>
+
+                      {/* Desconto */}
+                      <td style={{ textAlign: "right", color: sale.desconto > 0 ? "#b45309" : "var(--text-muted)", fontSize: "0.8125rem" }}>
+                        {sale.desconto > 0 ? `- ${fmtBRL(sale.desconto)}` : "—"}
+                      </td>
+
+                      {/* Total Líquido */}
+                      <td style={{ textAlign: "right", fontWeight: 700, color: isCancelada ? "var(--text-muted)" : "var(--accent)" }}>
+                        {fmtBRL(sale.total_liquido ?? sale.total)}
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ textAlign: "center" }}>
+                        <span style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          padding: "0.2rem 0.5rem",
+                          borderRadius: "999px",
+                          background: isCancelada ? "#fee2e2" : "var(--accent-subtle)",
+                          color: isCancelada ? "#991b1b" : "var(--accent-text)",
+                          border: `1px solid ${isCancelada ? "#fca5a5" : "var(--accent-border)"}`
+                        }}>
+                          {isCancelada ? "Cancelada" : "Ativa"}
                         </span>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+
+                      {/* Ações */}
+                      <td style={{ textAlign: "center" }}>
+                        {!isCancelada && (
+                          <button
+                            onClick={() => setSaleParaCancelar(sale)}
+                            className="btn btn-secondary"
+                            style={{ fontSize: "0.75rem", padding: "0.25rem 0.5rem", color: "#dc2626" }}
+                            title="Cancelar venda e estornar itens ao estoque"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                        {isCancelada && (
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic" }} title={sale.motivo_cancelamento}>
+                            Cancelada
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* Linha Expansível (Accordion com os itens) */}
+                    {isExpanded && (
+                      <tr style={{ background: "var(--bg-subtle)" }}>
+                        <td colSpan="10" style={{ padding: "0.75rem 1.25rem" }}>
+                          <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", padding: "0.875rem 1rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem", alignItems: "center" }}>
+                              <span style={{ fontWeight: 700, fontSize: "0.8125rem", color: "var(--text-main)" }}>
+                                Detalhes dos Itens da Venda #{sale.id}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                                Total Bruto: {fmtBRL(sale.total_bruto || (sale.total + (sale.desconto || 0)))}
+                              </span>
+                            </div>
+
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8125rem" }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>
+                                  <th style={{ textAlign: "left", padding: "0.35rem 0.5rem" }}>Mercadoria</th>
+                                  <th style={{ textAlign: "center", padding: "0.35rem 0.5rem", width: "90px" }}>Qtd</th>
+                                  <th style={{ textAlign: "right", padding: "0.35rem 0.5rem", width: "120px" }}>Preço Unit.</th>
+                                  <th style={{ textAlign: "right", padding: "0.35rem 0.5rem", width: "120px" }}>Subtotal</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sale.items && sale.items.length > 0 ? (
+                                  sale.items.map((it, i) => (
+                                    <tr key={it.id || i} style={{ borderBottom: i < sale.items.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+                                      <td style={{ padding: "0.4rem 0.5rem", fontWeight: 500, color: "var(--text-main)" }}>
+                                        {it.product_name}
+                                      </td>
+                                      <td style={{ padding: "0.4rem 0.5rem", textAlign: "center" }}>
+                                        {it.quantity} un
+                                      </td>
+                                      <td style={{ padding: "0.4rem 0.5rem", textAlign: "right", color: "var(--text-secondary)" }}>
+                                        {fmtBRL(it.unit_price)}
+                                      </td>
+                                      <td style={{ padding: "0.4rem 0.5rem", textAlign: "right", fontWeight: 600, color: "var(--text-main)" }}>
+                                        {fmtBRL(it.subtotal)}
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td style={{ padding: "0.4rem 0.5rem", fontWeight: 500 }}>{sale.produto_nome}</td>
+                                    <td style={{ padding: "0.4rem 0.5rem", textAlign: "center" }}>{sale.quantidade} un</td>
+                                    <td style={{ padding: "0.4rem 0.5rem", textAlign: "right" }}>{fmtBRL(sale.preco_venda || sale.total)}</td>
+                                    <td style={{ padding: "0.4rem 0.5rem", textAlign: "right", fontWeight: 600 }}>{fmtBRL(sale.total_bruto || sale.total)}</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+
+                            {sale.motivo_cancelamento && (
+                              <div style={{ marginTop: "0.75rem", padding: "0.5rem 0.75rem", background: "#fef2f2", borderRadius: "var(--radius-sm)", border: "1px solid #fecaca", color: "#991b1b", fontSize: "0.75rem" }}>
+                                <strong>Motivo do Cancelamento:</strong> {sale.motivo_cancelamento}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
@@ -313,22 +435,23 @@ export default function SalesList() {
           zIndex: 9999,
           padding: "1rem",
         }}>
-          <div className="card" style={{ maxWidth: "420px", width: "100%", padding: "1.75rem", animation: "fadeSlideIn 0.2s ease" }}>
+          <div className="card" style={{ maxWidth: "440px", width: "100%", padding: "1.75rem", animation: "fadeSlideIn 0.2s ease" }}>
             <h3 style={{ fontSize: "1.125rem", fontWeight: 700, marginBottom: "0.5rem", color: "#991b1b" }}>
-              Confirmar Cancelamento de Venda
+              Confirmar Cancelamento de Venda #{saleParaCancelar.id}
             </h3>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
-              Ao cancelar a venda do produto <strong>{saleParaCancelar.produto_nome}</strong> ({saleParaCancelar.quantidade} un), o estoque correspondente será estornado automaticamente.
+            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "1rem", lineHeight: 1.5 }}>
+              Ao cancelar a venda ({saleParaCancelar.produto_nome}), todos os <strong>{saleParaCancelar.quantidade} itens</strong> vendidos retornarão automaticamente ao estoque do mercado.
             </p>
 
             {cancelError && <div className="error-box" style={{ marginBottom: "1rem" }}>{cancelError}</div>}
 
             <form onSubmit={confirmarCancelamento}>
               <div className="form-group">
-                <label>Motivo do Cancelamento (opcional)</label>
+                <label>Motivo do Cancelamento (obrigatório)</label>
                 <input
                   type="text"
-                  placeholder="Ex: Devolução pelo cliente / Erro de digitação"
+                  required
+                  placeholder="Ex: Devolução pelo cliente / Erro no caixa"
                   value={motivoCancelamento}
                   onChange={(e) => setMotivoCancelamento(e.target.value)}
                 />
@@ -338,7 +461,7 @@ export default function SalesList() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setSaleParaCancelar(null)}
+                  onClick={() => { setSaleParaCancelar(null); setCancelError(""); }}
                   disabled={cancelando}
                 >
                   Voltar

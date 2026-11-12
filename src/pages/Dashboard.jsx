@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../services/api";
 import { Link } from "react-router-dom";
 
@@ -161,8 +161,48 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Card A Receber (Fiado) */}
+        <div className="stat-card" style={{ gridColumn: "span 6", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
+            <div className="stat-label">
+              <span>A Receber (Fiado / Caderneta)</span>
+              <div className="stat-icon-wrapper" style={{ background: "rgba(239, 68, 68, 0.12)", color: "#dc2626" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <line x1="19" y1="8" x2="19" y2="14" />
+                  <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "0.75rem", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                <div className="stat-value" style={{ fontSize: "2rem", color: (stats.fiado_a_receber > 0) ? "#dc2626" : "var(--text-main)" }}>
+                  R$ {(stats.fiado_a_receber || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="stat-subtext">
+                  {stats.fiado_clientes_count > 0 ? (
+                    <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                      ⚠️ {stats.fiado_clientes_count} {stats.fiado_clientes_count === 1 ? "cliente possui" : "clientes possuem"} débito em aberto
+                    </span>
+                  ) : (
+                    <span>Nenhum cliente com dívida em aberto</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Link to="/clientes" className="btn btn-secondary" style={{ fontSize: "0.8125rem", padding: "0.45rem 0.85rem" }}>
+                  Ver Clientes & Extratos →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Card Itens em Estoque */}
-        <div className="stat-card" style={{ gridColumn: "span 3" }}>
+        <div className="stat-card" style={{ gridColumn: "span 6" }}>
           <div className="stat-label">
             <span>Itens em Estoque</span>
             <div className="stat-icon-wrapper stat-icon-amber">
@@ -186,7 +226,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card Total de Vendas */}
-        <div className="stat-card" style={{ gridColumn: "span 3" }}>
+        <div className="stat-card" style={{ gridColumn: "span 6" }}>
           <div className="stat-label">
             <span>Vendas Realizadas</span>
             <div className="stat-icon-wrapper stat-icon-slate">
@@ -204,6 +244,28 @@ export default function Dashboard() {
             Transações ativas
           </div>
         </div>
+
+        {/* Card Alertas de Validade (Fase 3) */}
+        {(stats.validade_alertas_count > 0) && (
+          <div className="stat-card" style={{ gridColumn: "span 12", borderLeft: "3px solid #ea580c", background: "rgba(234,88,12,0.05)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                <div className="stat-label">
+                  <span>🗓️ Alertas de Validade</span>
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#ea580c", marginTop: "0.35rem" }}>
+                  {stats.validade_alertas_count} produto{stats.validade_alertas_count !== 1 ? "s" : ""} com lotes vencidos ou vencendo em 7 dias
+                </div>
+                <div className="stat-subtext" style={{ marginTop: "0.2rem" }}>
+                  Dê baixa nos itens vencidos para manter o estoque atualizado e evitar vendas indevidas.
+                </div>
+              </div>
+              <Link to="/produtos/alertas-validade" className="btn btn-secondary" style={{ fontSize: "0.875rem", borderColor: "#ea580c", color: "#ea580c" }}>
+                Ver Alertas e Dar Baixa →
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grid Meio: Produtos Mais Vendidos + Destaques */}

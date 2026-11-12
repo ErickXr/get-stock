@@ -8,11 +8,13 @@ export default function EditProduct() {
   const { id } = useParams();
   const [formData, setFormData] = useState({
     nome: "",
+    barcode: "",
     preco: "",
     quantidade: "",
     estoque_minimo: "5",
     categoria: "",
     imagem: "",
+    controla_validade: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,12 +48,14 @@ export default function EditProduct() {
       try {
         const response = await api.get(`/api/products/${id}`);
         setFormData({
-          nome:           response.data.nome,
-          preco:          response.data.preco.toString(),
-          quantidade:     response.data.quantidade.toString(),
-          estoque_minimo: (response.data.estoque_minimo ?? 5).toString(),
-          categoria:      response.data.categoria || "",
-          imagem:         response.data.imagem || "",
+          nome:              response.data.nome,
+          barcode:           response.data.barcode || "",
+          preco:             response.data.preco.toString(),
+          quantidade:        response.data.quantidade.toString(),
+          estoque_minimo:    (response.data.estoque_minimo ?? 5).toString(),
+          categoria:         response.data.categoria || "",
+          imagem:            response.data.imagem || "",
+          controla_validade: Boolean(response.data.controla_validade),
         });
       } catch (err) {
         alert("Erro ao carregar dados do produto.");
@@ -107,14 +111,26 @@ export default function EditProduct() {
 
       <div className="card">
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Nome da Mercadoria</label>
-            <input
-              type="text"
-              required
-              value={formData.nome}
-              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "1rem" }}>
+            <div className="form-group">
+              <label>Nome da Mercadoria</label>
+              <input
+                type="text"
+                required
+                value={formData.nome}
+                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Código de Barras / EAN (Opcional)</label>
+              <input
+                type="text"
+                placeholder="Ex: 7891234567890"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+              />
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
@@ -163,6 +179,23 @@ export default function EditProduct() {
                 value={formData.estoque_minimo}
                 onChange={(e) => setFormData({ ...formData, estoque_minimo: e.target.value })}
               />
+            </div>
+          </div>
+
+          {/* Toggle: Controla Validade */}
+          <div style={{ padding: "1rem", background: "var(--bg-subtle)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)", marginBottom: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setFormData(prev => ({ ...prev, controla_validade: !prev.controla_validade }))}>
+              <div>
+                <div style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "0.9375rem" }}>
+                  🗓️ Produto Perecível (Controle de Validade)
+                </div>
+                <div style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", marginTop: "0.15rem" }}>
+                  Ativa o controle de lotes com data de validade. Vendas usarão FEFO automaticamente.
+                </div>
+              </div>
+              <div style={{ width:"44px", height:"24px", borderRadius:"999px", flexShrink:0, background: formData.controla_validade ? "var(--accent)" : "var(--border-medium)", display:"flex", alignItems:"center", padding:"2px", transition:"background var(--transition)" }}>
+                <div style={{ width:"20px", height:"20px", borderRadius:"50%", background:"white", transform: formData.controla_validade ? "translateX(20px)" : "translateX(0)", transition:"transform var(--transition)", boxShadow:"var(--shadow-xs)" }} />
+              </div>
             </div>
           </div>
 

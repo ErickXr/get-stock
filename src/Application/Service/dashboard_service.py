@@ -1,5 +1,6 @@
-﻿from src.Infrastructure.Model.product_model import ProductModel
+from src.Infrastructure.Model.product_model import ProductModel
 from src.Infrastructure.Model.sale_model import SaleModel
+from src.Infrastructure.Model.sale_item_model import SaleItemModel
 from src.config.data_base import db
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -10,13 +11,14 @@ class DashboardService:
         total_stock = db.session.query(func.sum(ProductModel.quantidade))\
             .filter(ProductModel.seller_id == seller_id, ProductModel.status == "ativo").scalar() or 0
 
-        total_revenue = db.session.query(func.sum(SaleModel.quantidade * SaleModel.preco_venda - SaleModel.desconto))\
+        # Faturamento líquido direto de sales.total_liquido
+        total_revenue = db.session.query(func.sum(SaleModel.total_liquido))\
             .filter(SaleModel.seller_id == seller_id, SaleModel.status == "ativa").scalar() or 0
 
         total_sales_count = db.session.query(func.count(SaleModel.id))\
             .filter(SaleModel.seller_id == seller_id, SaleModel.status == "ativa").scalar() or 0
 
-        # Produtos com estoque abaixo do mínimo
+        # Produtos com estoque abaixo ou igual ao mínimo
         estoque_baixo = db.session.query(func.count(ProductModel.id))\
             .filter(
                 ProductModel.seller_id == seller_id,
@@ -24,16 +26,27 @@ class DashboardService:
                 ProductModel.quantidade <= ProductModel.estoque_minimo
             ).scalar() or 0
 
+        # Fiado / Caderneta a receber
+        from src.Application.Service.customer_service import CustomerService
+        fiado_overview = CustomerService.get_fiado_overview(seller_id)
+
+        # Alertas de validade (lotes vencidos ou vencendo em 7 dias)
+        from src.Application.Service.batch_service import BatchService
+        validade_alertas = BatchService.get_expiring_count(seller_id, days_ahead=7)
+
         return {
-            "total_estoque":         int(total_stock),
-            "valor_total_vendido":   float(total_revenue),
-            "total_vendas":          int(total_sales_count),
+            "total_estoque":          int(total_stock),
+            "valor_total_vendido":    float(total_revenue),
+            "total_vendas":           int(total_sales_count),
             "produtos_estoque_baixo": int(estoque_baixo),
+            "fiado_a_receber":        fiado_overview["total_a_receber"],
+            "fiado_clientes_count":   fiado_overview["clientes_devedores_count"],
+            "validade_alertas_count": validade_alertas,
         }
 
     @staticmethod
     def get_revenue_trend(seller_id: int, days: int = 7):
-        now   = datetime.now()
+        now = datetime.now()
         today = now.date()
         start_date      = today - timedelta(days=days - 1)
         prev_start_date = start_date - timedelta(days=days)
@@ -41,7 +54,7 @@ class DashboardService:
         rows = (
             db.session.query(
                 func.date(SaleModel.created_at).label("data"),
-                func.sum(SaleModel.quantidade * SaleModel.preco_venda - SaleModel.desconto).label("total")
+                func.sum(SaleModel.total_liquido).label("total")
             )
             .filter(
                 SaleModel.seller_id == seller_id,
@@ -52,7 +65,7 @@ class DashboardService:
             .all()
         )
 
-        by_date = {str(r.data): float(r.total) for r in rows}
+        by_date = {str(r.data): float(r.total or 0.0) for r in rows}
         trend   = []
         current_period_sum = 0.0
         for i in range(days):
@@ -62,7 +75,7 @@ class DashboardService:
             trend.append({"date": str(d), "label": d.strftime("%d/%m"), "total": round(val, 2)})
 
         prev_sum = (
-            db.session.query(func.sum(SaleModel.quantidade * SaleModel.preco_venda - SaleModel.desconto))
+            db.session.query(func.sum(SaleModel.total_liquido))
             .filter(
                 SaleModel.seller_id == seller_id,
                 SaleModel.status == "ativa",
@@ -89,28 +102,29 @@ class DashboardService:
 
     @staticmethod
     def get_top_products(seller_id: int, limit: int = 5):
+        # Utiliza sale_items agregado por item vendido nas vendas ativas do mercado
         rows = (
             db.session.query(
-                SaleModel.product_id,
-                ProductModel.nome,
-                func.sum(SaleModel.quantidade).label("total_vendido")
+                SaleItemModel.product_id,
+                SaleItemModel.product_name.label("nome"),
+                func.sum(SaleItemModel.quantity).label("total_vendido")
             )
-            .join(ProductModel, ProductModel.id == SaleModel.product_id)
+            .join(SaleModel, SaleModel.id == SaleItemModel.sale_id)
             .filter(SaleModel.seller_id == seller_id, SaleModel.status == "ativa")
-            .group_by(SaleModel.product_id, ProductModel.nome)
-            .order_by(func.sum(SaleModel.quantidade).desc())
+            .group_by(SaleItemModel.product_id, SaleItemModel.product_name)
+            .order_by(func.sum(SaleItemModel.quantity).desc())
             .limit(limit)
             .all()
         )
         if not rows:
             return []
-        max_val = rows[0].total_vendido if rows else 1
+        max_val = float(rows[0].total_vendido) if rows else 1.0
         return [
             {
                 "product_id":    r.product_id,
                 "nome":          r.nome,
                 "total_vendido": int(r.total_vendido),
-                "pct":           round((r.total_vendido / max_val) * 100, 1),
+                "pct":           round((float(r.total_vendido) / max_val) * 100, 1),
             }
             for r in rows
         ]

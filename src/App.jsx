@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login.jsx";
@@ -10,12 +10,18 @@ import Profile from "./pages/Profile.jsx";
 import ProductList from "./pages/Products/List.jsx";
 import CreateProduct from "./pages/Products/Create.jsx";
 import EditProduct from "./pages/Products/Edit.jsx";
+import ExpiryAlerts from "./pages/Products/ExpiryAlerts.jsx";
 
 import SalesList from "./pages/Sales/List.jsx";
 import CreateSale from "./pages/Sales/Create.jsx";
 
 import UsersList from "./pages/Users/List.jsx";
 import CreateUser from "./pages/Users/Create.jsx";
+
+import CustomersList from "./pages/Customers/List.jsx";
+import CreateCustomer from "./pages/Customers/Create.jsx";
+import EditCustomer from "./pages/Customers/Edit.jsx";
+import CustomerDetail from "./pages/Customers/Detail.jsx";
 
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
@@ -37,6 +43,7 @@ function App() {
           {/* Produtos (rotas principais e aliases) */}
           <Route path="/produtos" element={<ProductList />} />
           <Route path="/produtos/novo" element={<CreateProduct />} />
+          <Route path="/produtos/alertas-validade" element={<ExpiryAlerts />} />
           <Route path="/produtos/:id" element={<EditProduct />} />
           <Route path="/produtos/:id/edit" element={<EditProduct />} />
           <Route path="/produtos/:id/editar" element={<EditProduct />} />
@@ -59,6 +66,12 @@ function App() {
           <Route path="/funcionarios/novo" element={<CreateUser />} />
           <Route path="/users" element={<UsersList />} />
           <Route path="/users/create" element={<CreateUser />} />
+
+          {/* Clientes & Fiado */}
+          <Route path="/clientes" element={<CustomersList />} />
+          <Route path="/clientes/novo" element={<CreateCustomer />} />
+          <Route path="/clientes/:id" element={<CustomerDetail />} />
+          <Route path="/clientes/:id/editar" element={<EditCustomer />} />
         </Route>
 
         {/* Fallback */}

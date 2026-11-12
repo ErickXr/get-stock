@@ -17,10 +17,14 @@ def get_current_user():
 
     if tipo == "seller":
         seller = SellerModel.query.get(uid)
-        return seller, "admin", seller.id if seller else (None, None, None)
+        if seller:
+            return seller, "admin", seller.id
+        return None, None, None
     elif tipo == "user":
         user = UserModel.query.get(uid)
-        return user, user.nivel if user else None, user.seller_id if user else None
+        if user:
+            return user, user.nivel, user.seller_id
+        return None, None, None
     return None, None, None
 
 

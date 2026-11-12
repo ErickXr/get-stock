@@ -1,4 +1,4 @@
-﻿# src/routes.py
+# src/routes.py
 from flask import jsonify, make_response
 from flask_jwt_extended import jwt_required
 from src.Application.Controllers.user_controller import UserController
@@ -7,6 +7,7 @@ from src.Application.Controllers.product_controller import ProductController
 from src.Application.Controllers.sale_controller import SaleController
 from src.Application.Controllers.dashboard_controller import DashboardController
 from src.Application.Controllers.upload_controller import UploadController
+from src.Application.Controllers.customer_controller import CustomerController
 from flask import send_from_directory, current_app
 
 def init_routes(app):
@@ -81,6 +82,11 @@ def init_routes(app):
     def activate_product(product_id):
         return ProductController.activate_product(product_id)
 
+    @app.route('/api/products/by-barcode/<string:ean>', methods=['GET'])
+    @jwt_required()
+    def get_product_by_barcode(ean):
+        return ProductController.get_by_barcode(ean)
+
     # ===== VENDAS =====
     @app.route("/api/sales", methods=["POST"])
     @jwt_required()
@@ -151,3 +157,67 @@ def init_routes(app):
     @app.route('/api/users/<int:user_id>/toggle-status', methods=['PATCH'])
     def toggle_user_status(user_id):
         return UserController.toggle_user_status(user_id)
+
+    # ===== CLIENTES & FIADO =====
+    @app.route('/api/customers', methods=['POST'])
+    @jwt_required()
+    def create_customer():
+        return CustomerController.create_customer()
+
+    @app.route('/api/customers', methods=['GET'])
+    @jwt_required()
+    def list_customers():
+        return CustomerController.list_customers()
+
+    @app.route('/api/customers/overview', methods=['GET'])
+    @jwt_required()
+    def get_fiado_overview():
+        return CustomerController.get_fiado_overview()
+
+    @app.route('/api/customers/<int:customer_id>', methods=['GET'])
+    @jwt_required()
+    def get_customer(customer_id):
+        return CustomerController.get_customer(customer_id)
+
+    @app.route('/api/customers/<int:customer_id>', methods=['PUT'])
+    @jwt_required()
+    def update_customer(customer_id):
+        return CustomerController.update_customer(customer_id)
+
+    @app.route('/api/customers/<int:customer_id>/toggle-status', methods=['PATCH'])
+    @jwt_required()
+    def toggle_customer_status(customer_id):
+        return CustomerController.toggle_status(customer_id)
+
+    @app.route('/api/customers/<int:customer_id>/statement', methods=['GET'])
+    @jwt_required()
+    def get_customer_statement(customer_id):
+        return CustomerController.get_statement(customer_id)
+
+    @app.route('/api/customers/<int:customer_id>/payments', methods=['POST'])
+    @jwt_required()
+    def receive_customer_payment(customer_id):
+        return CustomerController.receive_payment(customer_id)
+
+    # ===== LOTES / VALIDADE (FASE 3) =====
+    # ATENÇÃO: rota estática /expiring-alerts deve vir antes da dinâmica /<int:product_id>/batches
+    @app.route('/api/products/expiring-alerts', methods=['GET'])
+    @jwt_required()
+    def get_expiring_alerts():
+        return ProductController.get_expiring_alerts()
+
+    @app.route('/api/products/<int:product_id>/batches', methods=['GET'])
+    @jwt_required()
+    def get_product_batches(product_id):
+        return ProductController.get_product_batches(product_id)
+
+    @app.route('/api/products/<int:product_id>/restock', methods=['POST'])
+    @jwt_required()
+    def restock_product(product_id):
+        return ProductController.restock_product(product_id)
+
+    @app.route('/api/batches/<int:batch_id>/write-off', methods=['POST'])
+    @jwt_required()
+    def write_off_batch(batch_id):
+        return ProductController.write_off_batch(batch_id)
+

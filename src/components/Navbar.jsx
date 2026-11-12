@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { api } from "../services/api";
 
@@ -11,6 +11,7 @@ export default function Navbar() {
     return localStorage.getItem("theme") === "dark";
   });
   const [baixoEstoqueCount, setBaixoEstoqueCount] = useState(0);
+  const [expiryCount, setExpiryCount] = useState(0);
 
   const seller = JSON.parse(localStorage.getItem("seller") || "null");
   const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -33,6 +34,9 @@ export default function Navbar() {
       .then(res => {
         if (res.data?.produtos_estoque_baixo) {
           setBaixoEstoqueCount(res.data.produtos_estoque_baixo);
+        }
+        if (res.data?.validade_alertas_count) {
+          setExpiryCount(res.data.validade_alertas_count);
         }
       })
       .catch(() => {});
@@ -74,6 +78,7 @@ export default function Navbar() {
       to: "/produtos",
       label: "Catálogo & Estoque",
       badge: baixoEstoqueCount > 0 ? baixoEstoqueCount : null,
+      expiryBadge: expiryCount > 0 ? expiryCount : null,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
@@ -91,6 +96,19 @@ export default function Navbar() {
           <circle cx="9" cy="21" r="1" />
           <circle cx="20" cy="21" r="1" />
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        </svg>
+      ),
+      show: true,
+    },
+    {
+      to: "/clientes",
+      label: "Clientes & Fiado",
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <line x1="19" y1="8" x2="19" y2="14" />
+          <line x1="22" y1="11" x2="16" y2="11" />
         </svg>
       ),
       show: true,
@@ -149,15 +167,20 @@ export default function Navbar() {
             >
               {item.icon}
               <span style={{ flex: 1 }}>{item.label}</span>
+              {item.expiryBadge && (
+                <span style={{
+                  fontSize: "0.6875rem", fontWeight: 700,
+                  backgroundColor: "#ea580c", color: "#ffffff",
+                  padding: "0.1rem 0.4rem", borderRadius: "999px", lineHeight: 1.2
+                }}>
+                  🗓️ {item.expiryBadge}
+                </span>
+              )}
               {item.badge && (
                 <span style={{
-                  fontSize: "0.6875rem",
-                  fontWeight: 700,
-                  backgroundColor: "#dc2626",
-                  color: "#ffffff",
-                  padding: "0.1rem 0.4rem",
-                  borderRadius: "999px",
-                  lineHeight: 1.2
+                  fontSize: "0.6875rem", fontWeight: 700,
+                  backgroundColor: "#dc2626", color: "#ffffff",
+                  padding: "0.1rem 0.4rem", borderRadius: "999px", lineHeight: 1.2
                 }}>
                   {item.badge}
                 </span>
